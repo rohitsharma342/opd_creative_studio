@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../utils/constants.dart';
-import '../models/performance_model.dart';
+import '../models/performance_model.dart' as performance;
 
 enum ChartType { line, bar, pie }
 
 class ChartWidget extends StatelessWidget {
   final String title;
-  final List<ChartData>? data;
-  final List<PieChartData>? pieData;
+  final List<performance.ChartData>? data;
+  final List<performance.PieChartData>? pieData;
   final ChartType type;
 
   const ChartWidget({
@@ -192,7 +192,7 @@ class ChartWidget extends StatelessWidget {
     }
 
     return PieChart(
-      PieChartData(
+      fl_chart.PieChartData(
         sections: pieData!
             .map(
               (data) => PieChartSectionData(
