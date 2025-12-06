@@ -1,21 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../models/performance_model.dart' as perf;
 import '../utils/constants.dart';
 
+export 'package:opd_creative_studio/models/performance_model.dart' show ChartData, PieChartData;
+
 enum ChartType { line, bar, pie }
-
-class ChartData {
-  final String label;
-  final double value;
-
-  ChartData({required this.label, required this.value});
-}
 
 class ChartWidget extends StatelessWidget {
   final String title;
   final List<ChartData>? data;
-  final List<perf.PieChartData>? pieData;
+  final List<PieChartData>? pieData;
   final ChartType type;
 
   const ChartWidget({
@@ -29,20 +23,21 @@ class ChartWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: AppConstants.defaultPadding,
+        padding: EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               title,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w600,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
               ),
             ),
             SizedBox(height: 16),
-            Container(
-              height: 200,
+            Expanded(
               child: _buildChart(),
             ),
           ],
@@ -64,121 +59,62 @@ class ChartWidget extends StatelessWidget {
 
   Widget _buildLineChart() {
     if (data == null || data!.isEmpty) {
-      return Center(
-        child: Text('No data available'),
-      );
+      return Center(child: Text('No data available'));
     }
 
     return LineChart(
       LineChartData(
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          horizontalInterval: 500,
-          getDrawingHorizontalLine: (value) {
-            return FlLine(
-              color: Colors.grey[300],
-              strokeWidth: 1,
-            );
-          },
-        ),
+        gridData: FlGridData(show: true, drawVerticalLine: false),
         titlesData: FlTitlesData(
-          show: true,
-          rightTitles: AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-          topTitles: AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 40,
+              getTitlesWidget: (value, meta) {
+                return Text(
+                  value.toInt().toString(),
+                  style: TextStyle(fontSize: 10),
+                );
+              },
+            ),
           ),
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
               reservedSize: 30,
-              interval: 1,
-              getTitlesWidget: (double value, TitleMeta meta) {
+              getTitlesWidget: (value, meta) {
                 final index = value.toInt();
                 if (index >= 0 && index < data!.length) {
-                  return SideTitleWidget(
-                    axisSide: meta.axisSide,
+                  return Padding(
+                    padding: EdgeInsets.only(top: 8),
                     child: Text(
                       data![index].label,
-                      style: TextStyle(
-                        color: AppConstants.textSecondary,
-                        fontSize: 10,
-                      ),
+                      style: TextStyle(fontSize: 10),
                     ),
                   );
                 }
-                return Container();
+                return Text('');
               },
             ),
           ),
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              interval: 1000,
-              reservedSize: 40,
-              getTitlesWidget: (double value, TitleMeta meta) {
-                return SideTitleWidget(
-                  axisSide: meta.axisSide,
-                  child: Text(
-                    '${(value / 1000).toStringAsFixed(0)}K',
-                    style: TextStyle(
-                      color: AppConstants.textSecondary,
-                      fontSize: 10,
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
+          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
         ),
-        borderData: FlBorderData(
-          show: true,
-          border: Border(
-            bottom: BorderSide(color: Colors.grey[300]!),
-            left: BorderSide(color: Colors.grey[300]!),
-          ),
-        ),
-        minX: 0,
-        maxX: (data!.length - 1).toDouble(),
-        minY: 0,
-        maxY: data!.map((e) => e.value).reduce((a, b) => a > b ? a : b) * 1.2,
+        borderData: FlBorderData(show: false),
         lineBarsData: [
           LineChartBarData(
-            spots: data!.asMap().entries.map((entry) {
-              return FlSpot(entry.key.toDouble(), entry.value.value);
-            }).toList(),
+            spots: data!
+                .asMap()
+                .entries
+                .map((e) => FlSpot(e.key.toDouble(), e.value.value))
+                .toList(),
             isCurved: true,
-            gradient: LinearGradient(
-              colors: [
-                AppConstants.primaryColor,
-                AppConstants.primaryColor.withOpacity(0.3),
-              ],
-            ),
+            color: AppConstants.primaryColor,
             barWidth: 3,
-            isStrokeCapRound: true,
-            dotData: FlDotData(
-              show: true,
-              getDotPainter: (spot, percent, barData, index) {
-                return FlDotCirclePainter(
-                  radius: 4,
-                  color: AppConstants.primaryColor,
-                  strokeWidth: 2,
-                  strokeColor: Colors.white,
-                );
-              },
-            ),
+            dotData: FlDotData(show: true),
             belowBarData: BarAreaData(
               show: true,
-              gradient: LinearGradient(
-                colors: [
-                  AppConstants.primaryColor.withOpacity(0.3),
-                  AppConstants.primaryColor.withOpacity(0.0),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
+              color: AppConstants.primaryColor.withOpacity(0.1),
             ),
           ),
         ],
@@ -188,154 +124,94 @@ class ChartWidget extends StatelessWidget {
 
   Widget _buildBarChart() {
     if (data == null || data!.isEmpty) {
-      return Center(
-        child: Text('No data available'),
-      );
+      return Center(child: Text('No data available'));
     }
 
     return BarChart(
       BarChartData(
-        alignment: BarChartAlignment.spaceAround,
-        maxY: data!.map((e) => e.value).reduce((a, b) => a > b ? a : b) * 1.2,
-        barTouchData: BarTouchData(
-          enabled: true,
-          touchTooltipData: BarTouchTooltipData(
-            tooltipBgColor: Colors.blueGrey,
-            getTooltipItem: (group, groupIndex, rod, rodIndex) {
-              return BarTooltipItem(
-                '${data![groupIndex].label}\n${rod.toY.round()}',
-                TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              );
-            },
-          ),
-        ),
+        gridData: FlGridData(show: true, drawVerticalLine: false),
         titlesData: FlTitlesData(
-          show: true,
-          rightTitles: AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-          topTitles: AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 40,
+              getTitlesWidget: (value, meta) {
+                return Text(
+                  value.toInt().toString(),
+                  style: TextStyle(fontSize: 10),
+                );
+              },
+            ),
           ),
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              getTitlesWidget: (double value, TitleMeta meta) {
+              reservedSize: 30,
+              getTitlesWidget: (value, meta) {
                 final index = value.toInt();
                 if (index >= 0 && index < data!.length) {
-                  return SideTitleWidget(
-                    axisSide: meta.axisSide,
+                  return Padding(
+                    padding: EdgeInsets.only(top: 8),
                     child: Text(
                       data![index].label,
-                      style: TextStyle(
-                        color: AppConstants.textSecondary,
-                        fontSize: 10,
-                      ),
+                      style: TextStyle(fontSize: 10),
                     ),
                   );
                 }
-                return Container();
+                return Text('');
               },
             ),
           ),
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
+          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
         ),
-        borderData: FlBorderData(
-          show: false,
-        ),
-        barGroups: data!.asMap().entries.map((entry) {
-          return BarChartGroupData(
-            x: entry.key,
-            barRods: [
-              BarChartRodData(
-                toY: entry.value.value,
-                color: AppConstants.primaryColor,
-                width: 20,
-                borderRadius: BorderRadius.circular(4),
+        borderData: FlBorderData(show: false),
+        barGroups: data!
+            .asMap()
+            .entries
+            .map(
+              (e) => BarChartGroupData(
+                x: e.key,
+                barRods: [
+                  BarChartRodData(
+                    toY: e.value.value,
+                    color: AppConstants.primaryColor,
+                    width: 20,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ],
               ),
-            ],
-          );
-        }).toList(),
+            )
+            .toList(),
       ),
     );
   }
 
   Widget _buildPieChart() {
     if (pieData == null || pieData!.isEmpty) {
-      return Center(
-        child: Text('No data available'),
-      );
+      return Center(child: Text('No data available'));
     }
 
-    return Row(
-      children: [
-        Expanded(
-          flex: 3,
-          child: PieChart(
-            PieChartData(
-              pieTouchData: PieTouchData(
-                touchCallback: (FlTouchEvent event, pieTouchResponse) {},
-              ),
-              borderData: FlBorderData(
-                show: false,
-              ),
-              sectionsSpace: 2,
-              centerSpaceRadius: 50,
-              sections: pieData!.map((pieChartData) {
-                return PieChartSectionData(
-                  color: Color(int.parse('FF${pieChartData.color}', radix: 16)),
-                  value: pieChartData.value,
-                  title: '${pieChartData.value.toInt()}%',
-                  radius: 60,
-                  titleStyle: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-        ),
-        Expanded(
-          flex: 2,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: pieData!.map<Widget>((pieChartData) {
-              return Container(
-                margin: EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 16,
-                      height: 16,
-                      decoration: BoxDecoration(
-                        color: Color(int.parse('FF${pieChartData.color}', radix: 16)),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        pieChartData.label,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppConstants.textSecondary,
-                        ),
-                      ),
-                    ),
-                  ],
+    return PieChart(
+      PieChartData(
+        sections: pieData!
+            .map(
+              (data) => PieChartSectionData(
+                value: data.value,
+                title: '${data.value.toInt()}',
+                color: Color(data.color),
+                radius: 50,
+                titleStyle: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
-              );
-            }).toList(),
-          ),
-        ),
-      ],
+              ),
+            )
+            .toList(),
+        sectionsSpace: 2,
+        centerSpaceRadius: 40,
+      ),
     );
   }
 }
