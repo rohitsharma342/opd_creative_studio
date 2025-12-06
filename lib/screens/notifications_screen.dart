@@ -1,344 +1,276 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import '../models/notification.dart';
-import '../utils/app_colors.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import '../services/data_service.dart';
+import '../models/notification_model.dart';
 import '../utils/constants.dart';
+import 'task_details_screen.dart';
 
-class NotificationsScreen extends StatefulWidget {
-  final List<AppNotification> notifications;
-  final Function(AppNotification) onNotificationRead;
+class NotificationsScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Notifications'),
+        automaticallyImplyLeading: false,
+        actions: [
+          Consumer<DataService>(
+            builder: (context, dataService, child) {
+              final hasUnread = dataService.unreadNotificationsCount > 0;
+              return TextButton(
+                onPressed: hasUnread
+                    ? () {
+                        dataService.markAllNotificationsAsRead();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('All notifications marked as read'),
+                            backgroundColor: AppConstants.success,
+                          ),
+                        );
+                      }
+                    : null,
+                child: Text(
+                  'Mark all read',
+                  style: TextStyle(
+                    color: hasUnread ? AppConstants.primaryColor : AppConstants.textSecondary,
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+      body: Consumer<DataService>(
+        builder: (context, dataService, child) {
+          final notifications = dataService.notifications;
 
-  const NotificationsScreen({
+          if (notifications.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.notifications_outlined,
+                    size: 80,
+                    color: AppConstants.textSecondary,
+                  ),
+                  SizedBox(height: 24),
+                  Text(
+                    'No notifications',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'You\'re all caught up! Check back later for updates.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return RefreshIndicator(
+            onRefresh: () => dataService.refreshData(),
+            child: AnimationLimiter(
+              child: ListView.builder(
+                padding: AppConstants.defaultPadding,
+                itemCount: notifications.length,
+                itemBuilder: (context, index) {
+                  final notification = notifications[index];
+                  return AnimationConfiguration.staggeredList(
+                    position: index,
+                    duration: Duration(milliseconds: 600),
+                    child: SlideAnimation(
+                      verticalOffset: 50.0,
+                      child: FadeInAnimation(
+                        child: Container(
+                          margin: EdgeInsets.only(bottom: 12),
+                          child: NotificationCard(
+                            notification: notification,
+                            onTap: () => _handleNotificationTap(
+                              context,
+                              notification,
+                              dataService,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _handleNotificationTap(
+    BuildContext context,
+    NotificationModel notification,
+    DataService dataService,
+  ) {
+    if (!notification.isRead) {
+      dataService.markNotificationAsRead(notification.id);
+    }
+
+    switch (notification.type) {
+      case NotificationType.taskUpdate:
+        if (notification.relatedTaskId != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TaskDetailsScreen(
+                taskId: notification.relatedTaskId!,
+              ),
+            ),
+          );
+        }
+        break;
+      case NotificationType.performanceReport:
+        DefaultTabController.of(context)?.animateTo(0);
+        break;
+      case NotificationType.systemAlert:
+      case NotificationType.reminder:
+        break;
+    }
+  }
+}
+
+class NotificationCard extends StatelessWidget {
+  final NotificationModel notification;
+  final VoidCallback onTap;
+
+  const NotificationCard({
     Key? key,
-    required this.notifications,
-    required this.onNotificationRead,
+    required this.notification,
+    required this.onTap,
   }) : super(key: key);
 
   @override
-  _NotificationsScreenState createState() => _NotificationsScreenState();
-}
-
-class _NotificationsScreenState extends State<NotificationsScreen> {
-  late List<AppNotification> notifications;
-
-  @override
-  void initState() {
-    super.initState();
-    notifications = List.from(widget.notifications);
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final unreadNotifications = notifications.where((n) => !n.isRead).length;
-    
-    return Scaffold(
-      backgroundColor: AppColors.surface,
-      appBar: AppBar(
-        title: Text('Notifications'),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        actions: [
-          if (unreadNotifications > 0)
-            TextButton(
-              onPressed: _markAllAsRead,
-              child: Text(
-                'Mark all as read',
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-        ],
-      ),
-      body: notifications.isEmpty
-          ? _buildEmptyState()
-          : Column(
-              children: [
-                if (unreadNotifications > 0)
-                  Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.all(16),
-                    color: AppColors.primary.withOpacity(0.1),
-                    child: Text(
-                      '$unreadNotifications unread notification${unreadNotifications > 1 ? 's' : ''}',
-                      style: TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                Expanded(
-                  child: ListView.separated(
-                    padding: EdgeInsets.all(16),
-                    itemCount: notifications.length,
-                    separatorBuilder: (context, index) => SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      final notification = notifications[index];
-                      return _buildNotificationItem(notification);
-                    },
-                  ),
-                ),
-              ],
-            ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.notifications_none,
-            size: 80,
-            color: AppColors.textLight,
-          ),
-          SizedBox(height: 16),
-          Text(
-            'No Notifications',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              color: AppColors.textSecondary,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'You\'re all caught up!\nWe\'ll notify you when something new happens.',
-            style: Theme.of(context).textTheme.bodyMedium,
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNotificationItem(AppNotification notification) {
-    return GestureDetector(
-      onTap: () => _onNotificationTap(notification),
-      child: Container(
-        padding: EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: notification.isRead ? Colors.white : AppColors.primary.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-          border: Border.all(
-            color: notification.isRead ? AppColors.divider : AppColors.primary.withOpacity(0.2),
-            width: notification.isRead ? 1 : 2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.cardShadow,
-              blurRadius: 4,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: _getNotificationTypeColor(notification.type).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    _getNotificationTypeIcon(notification.type),
-                    size: 20,
-                    color: _getNotificationTypeColor(notification.type),
-                  ),
-                ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        notification.title,
-                        style: TextStyle(
-                          fontWeight: notification.isRead ? FontWeight.w500 : FontWeight.bold,
-                          fontSize: 16,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        _formatTimestamp(notification.timestamp),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textLight,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (!notification.isRead)
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-              ],
-            ),
-            SizedBox(height: 12),
-            Text(
-              notification.description,
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary,
-                height: 1.4,
-              ),
-            ),
-            if (notification.relatedId != null) ...[
-              SizedBox(height: 12),
+    return Card(
+      elevation: notification.isRead ? 1 : 3,
+      color: notification.isRead ? null : AppConstants.primaryColor.withOpacity(0.02),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppConstants.defaultRadius,
+        child: Padding(
+          padding: AppConstants.defaultPadding,
+          child: Row(
+            children: [
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
+                  color: _getTypeColor().withOpacity(0.1),
+                  shape: BoxShape.circle,
                 ),
-                child: Text(
-                  'Tap to view details',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
+                child: Icon(
+                  _getTypeIcon(),
+                  color: _getTypeColor(),
+                  size: 24,
                 ),
+              ),
+              SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            notification.title,
+                            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              fontWeight: notification.isRead ? FontWeight.normal : FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        if (!notification.isRead)
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: AppConstants.primaryColor,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                      ],
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      notification.description,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      _formatTimestamp(notification.timestamp),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontSize: 12,
+                        color: AppConstants.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right,
+                color: AppConstants.textSecondary,
               ),
             ],
-          ],
+          ),
         ),
       ),
     );
   }
 
-  void _onNotificationTap(AppNotification notification) {
-    if (!notification.isRead) {
-      setState(() {
-        int index = notifications.indexOf(notification);
-        notifications[index] = notification.copyWith(isRead: true);
-      });
-      widget.onNotificationRead(notification);
-    }
-
-    if (notification.relatedId != null) {
-      _navigateToRelatedScreen(notification);
-    }
-  }
-
-  void _navigateToRelatedScreen(AppNotification notification) {
+  Color _getTypeColor() {
     switch (notification.type) {
       case NotificationType.taskUpdate:
-        Navigator.of(context).pop();
-        break;
-      case NotificationType.performanceUpdate:
-        Navigator.of(context).pop();
-        break;
-      case NotificationType.newLead:
-        Navigator.of(context).pop();
-        break;
-      default:
-        break;
-    }
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Navigating to ${_getNotificationTypeText(notification.type)} screen'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-  }
-
-  void _markAllAsRead() {
-    setState(() {
-      notifications = notifications.map((notification) {
-        if (!notification.isRead) {
-          widget.onNotificationRead(notification);
-          return notification.copyWith(isRead: true);
-        }
-        return notification;
-      }).toList();
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('All notifications marked as read'),
-        backgroundColor: AppColors.success,
-      ),
-    );
-  }
-
-  IconData _getNotificationTypeIcon(NotificationType type) {
-    switch (type) {
-      case NotificationType.performanceUpdate:
-        return Icons.trending_up;
-      case NotificationType.taskUpdate:
-        return Icons.task_alt;
-      case NotificationType.newLead:
-        return Icons.person_add;
-      case NotificationType.milestone:
-        return Icons.emoji_events;
-      case NotificationType.general:
-      default:
-        return Icons.info;
+        return AppConstants.primaryColor;
+      case NotificationType.performanceReport:
+        return Colors.blue;
+      case NotificationType.systemAlert:
+        return AppConstants.warning;
+      case NotificationType.reminder:
+        return AppConstants.success;
     }
   }
 
-  Color _getNotificationTypeColor(NotificationType type) {
-    switch (type) {
-      case NotificationType.performanceUpdate:
-        return AppColors.info;
+  IconData _getTypeIcon() {
+    switch (notification.type) {
       case NotificationType.taskUpdate:
-        return AppColors.primary;
-      case NotificationType.newLead:
-        return AppColors.success;
-      case NotificationType.milestone:
-        return Colors.amber;
-      case NotificationType.general:
-      default:
-        return AppColors.textSecondary;
-    }
-  }
-
-  String _getNotificationTypeText(NotificationType type) {
-    switch (type) {
-      case NotificationType.performanceUpdate:
-        return 'performance';
-      case NotificationType.taskUpdate:
-        return 'task details';
-      case NotificationType.newLead:
-        return 'leads';
-      case NotificationType.milestone:
-        return 'milestone';
-      case NotificationType.general:
-      default:
-        return 'general';
+        return Icons.task_outlined;
+      case NotificationType.performanceReport:
+        return Icons.analytics_outlined;
+      case NotificationType.systemAlert:
+        return Icons.warning_outlined;
+      case NotificationType.reminder:
+        return Icons.schedule_outlined;
     }
   }
 
   String _formatTimestamp(DateTime timestamp) {
     final now = DateTime.now();
     final difference = now.difference(timestamp);
-    
+
     if (difference.inMinutes < 1) {
       return 'Just now';
-    } else if (difference.inHours < 1) {
+    } else if (difference.inMinutes < 60) {
       return '${difference.inMinutes}m ago';
     } else if (difference.inHours < 24) {
       return '${difference.inHours}h ago';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday';
     } else if (difference.inDays < 7) {
       return '${difference.inDays}d ago';
     } else {
-      return DateFormat('MMM dd, yyyy').format(timestamp);
+      return '${timestamp.day}/${timestamp.month}/${timestamp.year}';
     }
   }
 }

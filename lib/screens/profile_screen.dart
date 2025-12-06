@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import '../services/static_data_service.dart';
-import '../utils/app_colors.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import '../services/data_service.dart';
+import '../models/user_model.dart';
 import '../utils/constants.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -10,397 +12,394 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final _formKey = GlobalKey<FormState>();
-  late TextEditingController _nameController;
-  late TextEditingController _emailController;
-  late TextEditingController _phoneController;
-  late Map<String, dynamic> userProfile;
-  late Map<String, bool> notificationPreferences;
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  bool _emailNotifications = true;
+  bool _pushNotifications = true;
   bool _isEditing = false;
 
   @override
   void initState() {
     super.initState();
-    _loadUserProfile();
-  }
-
-  void _loadUserProfile() {
-    userProfile = StaticDataService.getUserProfile();
-    notificationPreferences = Map<String, bool>.from(userProfile['notificationPreferences']);
-    
-    _nameController = TextEditingController(text: userProfile['name']);
-    _emailController = TextEditingController(text: userProfile['email']);
-    _phoneController = TextEditingController(text: userProfile['phone']);
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    _phoneController.dispose();
-    super.dispose();
+    final dataService = context.read<DataService>();
+    final user = dataService.currentUser;
+    if (user != null) {
+      _nameController.text = user.name;
+      _emailController.text = user.email;
+      _phoneController.text = user.phone;
+      _emailNotifications = user.emailNotifications;
+      _pushNotifications = user.pushNotifications;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.surface,
       appBar: AppBar(
         title: Text('Profile'),
-        backgroundColor: Colors.white,
-        elevation: 0,
+        automaticallyImplyLeading: false,
         actions: [
-          if (!_isEditing)
+          if (_isEditing)
+            TextButton(
+              onPressed: _saveProfile,
+              child: Text(
+                'Save',
+                style: TextStyle(color: AppConstants.primaryColor),
+              ),
+            )
+          else
             IconButton(
-              icon: Icon(Icons.edit, color: AppColors.primary),
-              onPressed: () {
-                setState(() {
-                  _isEditing = true;
-                });
-              },
+              icon: Icon(Icons.edit_outlined),
+              onPressed: () => setState(() => _isEditing = true),
             ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(AppConstants.defaultPadding),
-        child: Column(
-          children: [
-            _buildProfileHeader(),
-            SizedBox(height: 24),
-            _buildProfileForm(),
-            SizedBox(height: 24),
-            _buildNotificationPreferences(),
-            SizedBox(height: 24),
-            _buildActionButtons(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProfileHeader() {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.cardShadow,
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Stack(
-            children: [
-              CircleAvatar(
-                radius: 50,
-                backgroundImage: NetworkImage(userProfile['profileImage']),
+      body: Consumer<DataService>(
+        builder: (context, dataService, child) {
+          final user = dataService.currentUser;
+          
+          if (user == null) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.person_outline,
+                    size: 64,
+                    color: AppConstants.textSecondary,
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'Profile not available',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                ],
               ),
-              if (_isEditing)
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    padding: EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
+            );
+          }
+
+          return SingleChildScrollView(
+            padding: AppConstants.defaultPadding,
+            child: AnimationLimiter(
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  children: AnimationConfiguration.toStaggeredList(
+                    duration: Duration(milliseconds: 600),
+                    childAnimationBuilder: (widget) => SlideAnimation(
+                      verticalOffset: 50.0,
+                      child: FadeInAnimation(
+                        child: widget,
+                      ),
                     ),
-                    child: Icon(
-                      Icons.camera_alt,
-                      size: 16,
-                      color: Colors.white,
-                    ),
+                    children: [
+                      Card(
+                        child: Padding(
+                          padding: AppConstants.defaultPadding,
+                          child: Column(
+                            children: [
+                              Stack(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 50,
+                                    backgroundImage: NetworkImage(user.profileImage),
+                                  ),
+                                  if (_isEditing)
+                                    Positioned(
+                                      bottom: 0,
+                                      right: 0,
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: AppConstants.primaryColor,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: IconButton(
+                                          icon: Icon(Icons.camera_alt, color: Colors.white, size: 16),
+                                          constraints: BoxConstraints(
+                                            minWidth: 32,
+                                            minHeight: 32,
+                                          ),
+                                          onPressed: () {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Photo upload feature coming soon!'),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              if (!_isEditing) ...
+                                [
+                                  SizedBox(height: 16),
+                                  Text(
+                                    user.name,
+                                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                      fontSize: 20,
+                                    ),
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    user.email,
+                                    style: Theme.of(context).textTheme.bodyMedium,
+                                  ),
+                                ],
+                            ],
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 24),
+                      Card(
+                        child: Padding(
+                          padding: AppConstants.defaultPadding,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Personal Information',
+                                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                  fontSize: 18,
+                                ),
+                              ),
+                              SizedBox(height: 16),
+                              TextFormField(
+                                controller: _nameController,
+                                enabled: _isEditing,
+                                decoration: InputDecoration(
+                                  labelText: 'Full Name',
+                                  prefixIcon: Icon(Icons.person_outline),
+                                ),
+                                validator: (value) {
+                                  if (value == null || value.trim().isEmpty) {
+                                    return 'Please enter your name';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              SizedBox(height: 16),
+                              TextFormField(
+                                controller: _emailController,
+                                enabled: _isEditing,
+                                decoration: InputDecoration(
+                                  labelText: 'Email Address',
+                                  prefixIcon: Icon(Icons.email_outlined),
+                                ),
+                                keyboardType: TextInputType.emailAddress,
+                                validator: (value) {
+                                  if (value == null || value.trim().isEmpty) {
+                                    return 'Please enter your email';
+                                  }
+                                  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}\$').hasMatch(value)) {
+                                    return 'Please enter a valid email';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              SizedBox(height: 16),
+                              TextFormField(
+                                controller: _phoneController,
+                                enabled: _isEditing,
+                                decoration: InputDecoration(
+                                  labelText: 'Phone Number',
+                                  prefixIcon: Icon(Icons.phone_outlined),
+                                ),
+                                keyboardType: TextInputType.phone,
+                                validator: (value) {
+                                  if (value == null || value.trim().isEmpty) {
+                                    return 'Please enter your phone number';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 16),
+                      Card(
+                        child: Padding(
+                          padding: AppConstants.defaultPadding,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Notification Preferences',
+                                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                  fontSize: 18,
+                                ),
+                              ),
+                              SizedBox(height: 16),
+                              SwitchListTile(
+                                title: Text('Email Notifications'),
+                                subtitle: Text('Receive updates via email'),
+                                value: _emailNotifications,
+                                onChanged: _isEditing
+                                    ? (value) => setState(() => _emailNotifications = value)
+                                    : null,
+                                activeColor: AppConstants.primaryColor,
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                              SwitchListTile(
+                                title: Text('Push Notifications'),
+                                subtitle: Text('Receive updates on your device'),
+                                value: _pushNotifications,
+                                onChanged: _isEditing
+                                    ? (value) => setState(() => _pushNotifications = value)
+                                    : null,
+                                activeColor: AppConstants.primaryColor,
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 16),
+                      Card(
+                        child: Column(
+                          children: [
+                            ListTile(
+                              leading: Icon(Icons.help_outline, color: AppConstants.primaryColor),
+                              title: Text('Help & Support'),
+                              trailing: Icon(Icons.chevron_right),
+                              onTap: () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Help & Support coming soon!'),
+                                  ),
+                                );
+                              },
+                            ),
+                            Divider(height: 1),
+                            ListTile(
+                              leading: Icon(Icons.privacy_tip_outlined, color: AppConstants.primaryColor),
+                              title: Text('Privacy Policy'),
+                              trailing: Icon(Icons.chevron_right),
+                              onTap: () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Privacy Policy coming soon!'),
+                                  ),
+                                );
+                              },
+                            ),
+                            Divider(height: 1),
+                            ListTile(
+                              leading: Icon(Icons.info_outline, color: AppConstants.primaryColor),
+                              title: Text('About'),
+                              trailing: Icon(Icons.chevron_right),
+                              onTap: () => _showAboutDialog(),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 16),
+                      if (!_isEditing)
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: _showLogoutDialog,
+                            icon: Icon(Icons.logout),
+                            label: Text('Logout'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppConstants.error,
+                              foregroundColor: Colors.white,
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                            ),
+                          ),
+                        )
+                      else
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: _saveProfile,
+                                child: dataService.isLoading
+                                    ? SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                        ),
+                                      )
+                                    : Text('Save Changes'),
+                                style: ElevatedButton.styleFrom(
+                                  padding: EdgeInsets.symmetric(vertical: 16),
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: TextButton(
+                                onPressed: () {
+                                  setState(() => _isEditing = false);
+                                  _resetForm();
+                                },
+                                child: Text('Cancel'),
+                                style: TextButton.styleFrom(
+                                  padding: EdgeInsets.symmetric(vertical: 16),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      SizedBox(height: 24),
+                      Text(
+                        AppConstants.copyrightText,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
                 ),
-            ],
-          ),
-          SizedBox(height: 16),
-          Text(
-            userProfile['name'],
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
-          SizedBox(height: 4),
-          Text(
-            '${userProfile['specialty']} • ${userProfile['clinic']}',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 14,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildProfileForm() {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.cardShadow,
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Personal Information',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            SizedBox(height: 20),
-            _buildTextField(
-              controller: _nameController,
-              label: 'Full Name',
-              icon: Icons.person,
-              validator: (value) {
-                if (value?.isEmpty ?? true) {
-                  return 'Please enter your name';
-                }
-                return null;
-              },
-            ),
-            SizedBox(height: 16),
-            _buildTextField(
-              controller: _emailController,
-              label: 'Email Address',
-              icon: Icons.email,
-              keyboardType: TextInputType.emailAddress,
-              validator: (value) {
-                if (value?.isEmpty ?? true) {
-                  return 'Please enter your email';
-                }
-                if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value!)) {
-                  return 'Please enter a valid email';
-                }
-                return null;
-              },
-            ),
-            SizedBox(height: 16),
-            _buildTextField(
-              controller: _phoneController,
-              label: 'Phone Number',
-              icon: Icons.phone,
-              keyboardType: TextInputType.phone,
-              validator: (value) {
-                if (value?.isEmpty ?? true) {
-                  return 'Please enter your phone number';
-                }
-                return null;
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    TextInputType? keyboardType,
-    String? Function(String?)? validator,
-  }) {
-    return TextFormField(
-      controller: controller,
-      enabled: _isEditing,
-      keyboardType: keyboardType,
-      validator: validator,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, color: AppColors.primary),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: AppColors.divider),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: AppColors.primary),
-        ),
-        disabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: AppColors.divider),
-        ),
-        filled: true,
-        fillColor: _isEditing ? Colors.white : AppColors.surface,
-      ),
-    );
-  }
-
-  Widget _buildNotificationPreferences() {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.cardShadow,
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Notification Preferences',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          SizedBox(height: 16),
-          ...notificationPreferences.entries.map((entry) {
-            return _buildNotificationToggle(
-              _formatPreferenceName(entry.key),
-              entry.value,
-              (value) {
-                setState(() {
-                  notificationPreferences[entry.key] = value;
-                });
-              },
-            );
-          }).toList(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNotificationToggle(
-    String title,
-    bool value,
-    Function(bool) onChanged,
-  ) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 16,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ),
-          Switch(
-            value: value,
-            onChanged: _isEditing ? onChanged : null,
-            activeColor: AppColors.primary,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionButtons() {
-    if (_isEditing) {
-      return Row(
-        children: [
-          Expanded(
-            child: OutlinedButton(
-              onPressed: _cancelEditing,
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: AppColors.textSecondary),
-                padding: EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: Text(
-                'Cancel',
-                style: TextStyle(color: AppColors.textSecondary),
-              ),
-            ),
-          ),
-          SizedBox(width: 16),
-          Expanded(
-            child: ElevatedButton(
-              onPressed: _saveProfile,
-              style: ElevatedButton.styleFrom(
-                padding: EdgeInsets.symmetric(vertical: 16),
-              ),
-              child: Text('Save Changes'),
-            ),
-          ),
-        ],
-      );
-    } else {
-      return Container(
-        width: double.infinity,
-        child: ElevatedButton(
-          onPressed: _showLogoutDialog,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.error,
-            padding: EdgeInsets.symmetric(vertical: 16),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.logout, color: Colors.white),
-              SizedBox(width: 8),
-              Text(
-                'Logout',
-                style: TextStyle(color: Colors.white),
-              ),
-            ],
-          ),
-        ),
-      );
+  void _resetForm() {
+    final dataService = context.read<DataService>();
+    final user = dataService.currentUser;
+    if (user != null) {
+      _nameController.text = user.name;
+      _emailController.text = user.email;
+      _phoneController.text = user.phone;
+      _emailNotifications = user.emailNotifications;
+      _pushNotifications = user.pushNotifications;
     }
   }
 
-  void _cancelEditing() {
-    setState(() {
-      _isEditing = false;
-      _nameController.text = userProfile['name'];
-      _emailController.text = userProfile['email'];
-      _phoneController.text = userProfile['phone'];
-      notificationPreferences = Map<String, bool>.from(userProfile['notificationPreferences']);
-    });
-  }
+  Future<void> _saveProfile() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
-  void _saveProfile() {
-    if (_formKey.currentState?.validate() ?? false) {
-      setState(() {
-        userProfile['name'] = _nameController.text;
-        userProfile['email'] = _emailController.text;
-        userProfile['phone'] = _phoneController.text;
-        userProfile['notificationPreferences'] = notificationPreferences;
-        _isEditing = false;
-      });
+    final dataService = context.read<DataService>();
+    final currentUser = dataService.currentUser;
+    
+    if (currentUser != null) {
+      final updatedUser = currentUser.copyWith(
+        name: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        phone: _phoneController.text.trim(),
+        emailNotifications: _emailNotifications,
+        pushNotifications: _pushNotifications,
+      );
+
+      await dataService.updateUserProfile(updatedUser);
+      
+      setState(() => _isEditing = false);
       
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Profile updated successfully'),
-          backgroundColor: AppColors.success,
+          backgroundColor: AppConstants.success,
         ),
       );
     }
@@ -409,57 +408,69 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _showLogoutDialog() {
     showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppConstants.borderRadius),
+      builder: (context) => AlertDialog(
+        title: Text('Logout'),
+        content: Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
           ),
-          title: Text('Confirm Logout'),
-          content: Text('Are you sure you want to logout?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancel'),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Logged out successfully'),
+                  backgroundColor: AppConstants.success,
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppConstants.error,
+              foregroundColor: Colors.white,
             ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _logout();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.error,
-              ),
-              child: Text('Logout'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _logout() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Logged out successfully'),
-        backgroundColor: AppColors.success,
+            child: Text('Logout'),
+          ),
+        ],
       ),
     );
   }
 
-  String _formatPreferenceName(String key) {
-    switch (key) {
-      case 'emailNotifications':
-        return 'Email Notifications';
-      case 'pushNotifications':
-        return 'Push Notifications';
-      case 'performanceAlerts':
-        return 'Performance Alerts';
-      case 'taskUpdates':
-        return 'Task Updates';
-      case 'weeklyReports':
-        return 'Weekly Reports';
-      default:
-        return key;
-    }
+  void _showAboutDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(AppConstants.appName),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Version 1.0.0'),
+            SizedBox(height: 8),
+            Text(AppConstants.tagline),
+            SizedBox(height: 16),
+            Text(
+              'A dedicated mobile reporting app designed specifically for doctors in India who use digital marketing services.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    super.dispose();
   }
 }

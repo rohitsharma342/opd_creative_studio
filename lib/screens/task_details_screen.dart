@@ -1,606 +1,451 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import '../models/task.dart';
-import '../utils/app_colors.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import '../services/data_service.dart';
+import '../models/task_model.dart';
 import '../utils/constants.dart';
 
 class TaskDetailsScreen extends StatefulWidget {
-  final Task task;
+  final String taskId;
 
-  const TaskDetailsScreen({Key? key, required this.task}) : super(key: key);
+  const TaskDetailsScreen({Key? key, required this.taskId}) : super(key: key);
 
   @override
   _TaskDetailsScreenState createState() => _TaskDetailsScreenState();
 }
 
 class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
-  late Task task;
   final TextEditingController _updateController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    task = widget.task;
-  }
-
-  @override
-  void dispose() {
-    _updateController.dispose();
-    super.dispose();
-  }
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
+  bool _isEditing = false;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.surface,
       appBar: AppBar(
         title: Text('Task Details'),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
         actions: [
           IconButton(
-            icon: Icon(Icons.edit, color: AppColors.primary),
-            onPressed: _showEditTaskDialog,
+            icon: Icon(_isEditing ? Icons.close : Icons.edit),
+            onPressed: () {
+              setState(() {
+                _isEditing = !_isEditing;
+                if (!_isEditing) {
+                  _titleController.clear();
+                  _descriptionController.clear();
+                }
+              });
+            },
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(AppConstants.defaultPadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildTaskHeader(),
-            SizedBox(height: 24),
-            _buildTaskDescription(),
-            SizedBox(height: 24),
-            _buildProgressSection(),
-            SizedBox(height: 24),
-            _buildUpdatesSection(),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddUpdateDialog,
-        backgroundColor: AppColors.primary,
-        icon: Icon(Icons.add, color: Colors.white),
-        label: Text(
-          'Add Update',
-          style: TextStyle(color: Colors.white),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTaskHeader() {
-    return Container(
-      padding: EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.cardShadow,
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  task.title,
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _getStatusColor(task.status).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  _getStatusText(task.status),
-                  style: TextStyle(
-                    color: _getStatusColor(task.status),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(
-                Icons.calendar_today,
-                size: 16,
-                color: AppColors.textSecondary,
-              ),
-              SizedBox(width: 8),
-              Text(
-                'Created: ${DateFormat('MMM dd, yyyy').format(task.createdAt)}',
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 14,
-                ),
-              ),
-              Spacer(),
-              Icon(
-                Icons.flag,
-                size: 16,
-                color: _getPriorityColor(task.priority),
-              ),
-              SizedBox(width: 4),
-              Text(
-                'Priority ${task.priority}',
-                style: TextStyle(
-                  color: _getPriorityColor(task.priority),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTaskDescription() {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.cardShadow,
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Description',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          SizedBox(height: 12),
-          Text(
-            task.description,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              height: 1.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProgressSection() {
-    double progress = _calculateProgress();
-    
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.cardShadow,
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Progress',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              Text(
-                '${(progress * 100).toInt()}%',
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 12),
-          LinearProgressIndicator(
-            value: progress,
-            backgroundColor: AppColors.divider,
-            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-            minHeight: 8,
-          ),
-          SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildProgressStat('Total Updates', task.updates.length.toString()),
-              _buildProgressStat('Last Update', _getLastUpdateTime()),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProgressStat(String label, String value) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: AppColors.primary,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: AppColors.textSecondary,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildUpdatesSection() {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.cardShadow,
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Updates Timeline',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          SizedBox(height: 16),
-          ...task.updates.asMap().entries.map((entry) {
-            int index = entry.key;
-            TaskUpdate update = entry.value;
-            bool isLast = index == task.updates.length - 1;
-            return _buildUpdateItem(update, isLast);
-          }).toList(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildUpdateItem(TaskUpdate update, bool isLast) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Column(
-          children: [
-            Container(
-              width: 12,
-              height: 12,
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                shape: BoxShape.circle,
-              ),
-            ),
-            if (!isLast)
-              Container(
-                width: 2,
-                height: 50,
-                color: AppColors.divider,
-              ),
-          ],
-        ),
-        SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                update.description,
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
-              SizedBox(height: 4),
-              Row(
+      body: Consumer<DataService>(
+        builder: (context, dataService, child) {
+          final task = dataService.getTaskById(widget.taskId);
+          
+          if (task == null) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    DateFormat('MMM dd, yyyy • HH:mm').format(update.timestamp),
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                    ),
+                  Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: AppConstants.textSecondary,
                   ),
-                  SizedBox(width: 8),
+                  SizedBox(height: 16),
                   Text(
-                    '• ${update.updatedBy}',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
+                    'Task not found',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'The requested task could not be loaded',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text('Go Back'),
                   ),
                 ],
               ),
-              if (!isLast) SizedBox(height: 16),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+            );
+          }
 
-  void _showAddUpdateDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppConstants.borderRadius),
-          ),
-          title: Text('Add Update'),
-          content: TextField(
-            controller: _updateController,
-            maxLines: 3,
-            decoration: InputDecoration(
-              hintText: 'Enter update description...',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _updateController.clear();
-              },
-              child: Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (_updateController.text.trim().isNotEmpty) {
-                  _addUpdate(_updateController.text.trim());
-                  Navigator.of(context).pop();
-                  _updateController.clear();
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Please enter a valid update'),
-                      backgroundColor: AppColors.error,
+          if (_isEditing && _titleController.text.isEmpty) {
+            _titleController.text = task.title;
+            _descriptionController.text = task.description;
+          }
+
+          return SingleChildScrollView(
+            padding: AppConstants.defaultPadding,
+            child: AnimationLimiter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: AnimationConfiguration.toStaggeredList(
+                  duration: Duration(milliseconds: 600),
+                  childAnimationBuilder: (widget) => SlideAnimation(
+                    verticalOffset: 50.0,
+                    child: FadeInAnimation(
+                      child: widget,
                     ),
-                  );
-                }
-              },
-              child: Text('Add Update'),
+                  ),
+                  children: [
+                    Card(
+                      child: Padding(
+                        padding: AppConstants.defaultPadding,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (_isEditing) ...
+                              [
+                                TextField(
+                                  controller: _titleController,
+                                  decoration: InputDecoration(
+                                    labelText: 'Task Title',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                    fontSize: 20,
+                                  ),
+                                ),
+                                SizedBox(height: 16),
+                                TextField(
+                                  controller: _descriptionController,
+                                  decoration: InputDecoration(
+                                    labelText: 'Description',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  maxLines: 3,
+                                ),
+                                SizedBox(height: 16),
+                                Row(
+                                  children: [
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          _isEditing = false;
+                                        });
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text('Task updated successfully'),
+                                            backgroundColor: AppConstants.success,
+                                          ),
+                                        );
+                                      },
+                                      child: Text('Save Changes'),
+                                    ),
+                                    SizedBox(width: 12),
+                                    TextButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          _isEditing = false;
+                                        });
+                                      },
+                                      child: Text('Cancel'),
+                                    ),
+                                  ],
+                                ),
+                              ]
+                            else ...
+                              [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        task.title,
+                                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                          fontSize: 20,
+                                        ),
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: _getStatusColor(task.status).withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        _getStatusText(task.status),
+                                        style: TextStyle(
+                                          color: _getStatusColor(task.status),
+                                          fontWeight: FontWeight.w500,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 12),
+                                Text(
+                                  task.description,
+                                  style: Theme.of(context).textTheme.bodyLarge,
+                                ),
+                                SizedBox(height: 16),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.calendar_today,
+                                      size: 16,
+                                      color: AppConstants.textSecondary,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Created: ${_formatDate(task.createdAt)}',
+                                      style: Theme.of(context).textTheme.bodyMedium,
+                                    ),
+                                  ],
+                                ),
+                                if (task.updatedAt != null) ...
+                                  [
+                                    SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.update,
+                                          size: 16,
+                                          color: AppConstants.textSecondary,
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Updated: ${_formatDate(task.updatedAt!)}',
+                                          style: Theme.of(context).textTheme.bodyMedium,
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                              ],
+                          ],
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Progress Updates',
+                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            fontSize: 18,
+                          ),
+                        ),
+                        ElevatedButton.icon(
+                          onPressed: () => _showAddUpdateDialog(context, dataService),
+                          icon: Icon(Icons.add),
+                          label: Text('Add Update'),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 16),
+                    if (task.updates.isEmpty)
+                      Card(
+                        child: Padding(
+                          padding: EdgeInsets.all(32),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.timeline,
+                                size: 48,
+                                color: AppConstants.textSecondary,
+                              ),
+                              SizedBox(height: 16),
+                              Text(
+                                'No updates yet',
+                                style: Theme.of(context).textTheme.bodyLarge,
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                'Add the first update to track progress',
+                                style: Theme.of(context).textTheme.bodyMedium,
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    else
+                      ...task.updates.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final update = entry.value;
+                        final isLast = index == task.updates.length - 1;
+                        
+                        return AnimationConfiguration.staggeredList(
+                          position: index,
+                          duration: Duration(milliseconds: 400),
+                          child: SlideAnimation(
+                            horizontalOffset: 30.0,
+                            child: FadeInAnimation(
+                              child: Container(
+                                margin: EdgeInsets.only(bottom: isLast ? 0 : 16),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Column(
+                                      children: [
+                                        Container(
+                                          width: 12,
+                                          height: 12,
+                                          decoration: BoxDecoration(
+                                            color: AppConstants.primaryColor,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                        if (!isLast)
+                                          Container(
+                                            width: 2,
+                                            height: 60,
+                                            color: AppConstants.primaryColor.withOpacity(0.3),
+                                          ),
+                                      ],
+                                    ),
+                                    SizedBox(width: 16),
+                                    Expanded(
+                                      child: Card(
+                                        margin: EdgeInsets.zero,
+                                        child: Padding(
+                                          padding: AppConstants.defaultPadding,
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                update.description,
+                                                style: Theme.of(context).textTheme.bodyLarge,
+                                              ),
+                                              SizedBox(height: 8),
+                                              Row(
+                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                children: [
+                                                  Text(
+                                                    'By ${update.author}',
+                                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                                      fontWeight: FontWeight.w500,
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    _formatDateTime(update.timestamp),
+                                                    style: Theme.of(context).textTheme.bodyMedium,
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                  ],
+                ),
+              ),
             ),
-          ],
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
-  void _showEditTaskDialog() {
-    final titleController = TextEditingController(text: task.title);
-    final descriptionController = TextEditingController(text: task.description);
-    
+  void _showAddUpdateDialog(BuildContext context, DataService dataService) {
     showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppConstants.borderRadius),
+      builder: (context) => AlertDialog(
+        title: Text('Add Progress Update'),
+        content: TextField(
+          controller: _updateController,
+          decoration: InputDecoration(
+            hintText: 'Describe the progress made...',
+            border: OutlineInputBorder(),
           ),
-          title: Text('Edit Task'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: titleController,
-                decoration: InputDecoration(
-                  labelText: 'Title',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-              SizedBox(height: 16),
-              TextField(
-                controller: descriptionController,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  labelText: 'Description',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                _updateTask(
-                  titleController.text.trim(),
-                  descriptionController.text.trim(),
-                );
-                Navigator.of(context).pop();
-              },
-              child: Text('Save'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _addUpdate(String description) {
-    setState(() {
-      final newUpdate = TaskUpdate(
-        id: '${task.id}-${task.updates.length + 1}',
-        description: description,
-        timestamp: DateTime.now(),
-        updatedBy: 'Dr. Rajesh Kumar',
-      );
-      
-      task.updates.add(newUpdate);
-    });
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Update added successfully'),
-        backgroundColor: AppColors.success,
-      ),
-    );
-  }
-
-  void _updateTask(String title, String description) {
-    if (title.isEmpty || description.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Please fill in all fields'),
-          backgroundColor: AppColors.error,
+          maxLines: 3,
+          autofocus: true,
         ),
-      );
-      return;
-    }
-    
-    setState(() {
-      task = Task(
-        id: task.id,
-        title: title,
-        description: description,
-        status: task.status,
-        createdAt: task.createdAt,
-        updatedAt: DateTime.now(),
-        updates: task.updates,
-        priority: task.priority,
-      );
-    });
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Task updated successfully'),
-        backgroundColor: AppColors.success,
+        actions: [
+          TextButton(
+            onPressed: () {
+              _updateController.clear();
+              Navigator.pop(context);
+            },
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (_updateController.text.trim().isNotEmpty) {
+                await dataService.addTaskUpdate(
+                  widget.taskId,
+                  _updateController.text.trim(),
+                );
+                _updateController.clear();
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Update added successfully'),
+                    backgroundColor: AppConstants.success,
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Please enter an update description'),
+                    backgroundColor: AppConstants.error,
+                  ),
+                );
+              }
+            },
+            child: Text('Add Update'),
+          ),
+        ],
       ),
     );
-  }
-
-  double _calculateProgress() {
-    switch (task.status) {
-      case TaskStatus.completed:
-        return 1.0;
-      case TaskStatus.inProgress:
-        return 0.6;
-      case TaskStatus.onHold:
-        return 0.3;
-      case TaskStatus.pending:
-        return 0.1;
-      default:
-        return 0.0;
-    }
-  }
-
-  String _getLastUpdateTime() {
-    if (task.updates.isEmpty) return 'No updates';
-    
-    final lastUpdate = task.updates.last.timestamp;
-    final now = DateTime.now();
-    final difference = now.difference(lastUpdate);
-    
-    if (difference.inHours < 1) {
-      return '${difference.inMinutes}m ago';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours}h ago';
-    } else {
-      return '${difference.inDays}d ago';
-    }
   }
 
   Color _getStatusColor(TaskStatus status) {
     switch (status) {
-      case TaskStatus.completed:
-        return AppColors.success;
-      case TaskStatus.inProgress:
-        return AppColors.info;
-      case TaskStatus.onHold:
-        return AppColors.warning;
       case TaskStatus.pending:
-        return AppColors.error;
-      default:
-        return AppColors.textSecondary;
+        return AppConstants.warning;
+      case TaskStatus.inProgress:
+        return AppConstants.primaryColor;
+      case TaskStatus.completed:
+        return AppConstants.success;
+      case TaskStatus.cancelled:
+        return AppConstants.error;
     }
   }
 
   String _getStatusText(TaskStatus status) {
     switch (status) {
-      case TaskStatus.completed:
-        return 'Completed';
-      case TaskStatus.inProgress:
-        return 'In Progress';
-      case TaskStatus.onHold:
-        return 'On Hold';
       case TaskStatus.pending:
         return 'Pending';
-      default:
-        return 'Unknown';
+      case TaskStatus.inProgress:
+        return 'In Progress';
+      case TaskStatus.completed:
+        return 'Completed';
+      case TaskStatus.cancelled:
+        return 'Cancelled';
     }
   }
 
-  Color _getPriorityColor(int priority) {
-    switch (priority) {
-      case 1:
-        return AppColors.error;
-      case 2:
-        return AppColors.warning;
-      case 3:
-        return AppColors.info;
-      default:
-        return AppColors.textSecondary;
-    }
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
+  String _formatDateTime(DateTime date) {
+    return '${date.day}/${date.month}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  void dispose() {
+    _updateController.dispose();
+    _titleController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
   }
 }

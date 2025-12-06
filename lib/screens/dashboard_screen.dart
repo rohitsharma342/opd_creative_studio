@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import '../models/performance_metrics.dart';
-import '../models/task.dart';
-import '../models/notification.dart';
-import '../services/static_data_service.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import '../services/data_service.dart';
 import '../widgets/performance_card.dart';
 import '../widgets/chart_widget.dart';
 import '../widgets/task_item.dart';
-import '../utils/app_colors.dart';
+import '../widgets/custom_app_bar.dart';
 import '../utils/constants.dart';
 import 'task_details_screen.dart';
 import 'notifications_screen.dart';
@@ -18,395 +17,393 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  late PerformanceMetrics performanceMetrics;
-  late List<Task> tasks;
-  late List<AppNotification> notifications;
   int _selectedIndex = 0;
-  String searchQuery = '';
 
-  @override
-  void initState() {
-    super.initState();
-    _loadData();
-  }
-
-  void _loadData() {
-    setState(() {
-      performanceMetrics = StaticDataService.getPerformanceMetrics();
-      tasks = StaticDataService.getTasks();
-      notifications = StaticDataService.getNotifications();
-    });
-  }
-
-  int get unreadNotificationCount =>
-      notifications.where((n) => !n.isRead).length;
-
-  List<Task> get filteredTasks {
-    if (searchQuery.isEmpty) return tasks;
-    return tasks
-        .where((task) =>
-            task.title.toLowerCase().contains(searchQuery.toLowerCase()) ||
-            task.description.toLowerCase().contains(searchQuery.toLowerCase()))
-        .toList();
-  }
+  final List<Widget> _screens = [
+    DashboardContent(),
+    NotificationsScreen(),
+    ProfileScreen(),
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.surface,
-      body: _selectedIndex == 0 ? _buildDashboard() : ProfileScreen(),
+      body: _screens[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
-        onTap: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
-        selectedItemColor: AppColors.primary,
-        unselectedItemColor: AppColors.textLight,
+        onTap: (index) => setState(() => _selectedIndex = index),
+        selectedItemColor: AppConstants.primaryColor,
+        unselectedItemColor: AppConstants.textSecondary,
+        type: BottomNavigationBarType.fixed,
         items: [
           BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard),
+            icon: Icon(Icons.dashboard_outlined),
+            activeIcon: Icon(Icons.dashboard),
             label: 'Dashboard',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person),
+            icon: Consumer<DataService>(
+              builder: (context, dataService, child) {
+                final unreadCount = dataService.unreadNotificationsCount;
+                return Stack(
+                  children: [
+                    Icon(Icons.notifications_outlined),
+                    if (unreadCount > 0)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          padding: EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: AppConstants.error,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          constraints: BoxConstraints(
+                            minWidth: 16,
+                            minHeight: 16,
+                          ),
+                          child: Text(
+                            unreadCount.toString(),
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+            activeIcon: Icon(Icons.notifications),
+            label: 'Notifications',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outlined),
+            activeIcon: Icon(Icons.person),
             label: 'Profile',
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildDashboard() {
-    return SafeArea(
-      child: RefreshIndicator(
-        onRefresh: () async {
-          await Future.delayed(Duration(seconds: 1));
-          _loadData();
-        },
+class DashboardContent extends StatefulWidget {
+  @override
+  _DashboardContentState createState() => _DashboardContentState();
+}
+
+class _DashboardContentState extends State<DashboardContent> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: RefreshIndicator(
+        onRefresh: () => context.read<DataService>().refreshData(),
         child: CustomScrollView(
           slivers: [
             SliverAppBar(
               expandedHeight: 120,
-              floating: false,
+              floating: true,
               pinned: true,
               backgroundColor: Colors.white,
               elevation: 0,
               flexibleSpace: FlexibleSpaceBar(
-                background: _buildHeader(),
+                background: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        AppConstants.primaryColor.withOpacity(0.1),
+                        Colors.white,
+                      ],
+                    ),
+                  ),
+                  padding: EdgeInsets.fromLTRB(16, 60, 16, 16),
+                  child: Consumer<DataService>(
+                    builder: (context, dataService, child) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 25,
+                                backgroundImage: NetworkImage(
+                                  dataService.currentUser?.profileImage ??
+                                      AppConstants.sampleImages[0],
+                                ),
+                              ),
+                              SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Welcome back!',
+                                      style: Theme.of(context).textTheme.bodyMedium,
+                                    ),
+                                    Text(
+                                      dataService.currentUser?.name ?? 'Doctor',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .headlineMedium
+                                          ?.copyWith(fontSize: 20),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
               ),
             ),
             SliverToBoxAdapter(
-              child: Column(
-                children: [
-                  _buildSearchBar(),
-                  _buildPerformanceCards(),
-                  _buildChartsSection(),
-                  _buildTasksSection(),
-                  _buildFooter(),
-                ],
+              child: Padding(
+                padding: AppConstants.defaultPadding,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: _searchController,
+                      onChanged: (value) => setState(() => _searchQuery = value),
+                      decoration: InputDecoration(
+                        hintText: 'Search tasks or reports...',
+                        prefixIcon: Icon(Icons.search),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: Icon(Icons.clear),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() => _searchQuery = '');
+                                },
+                              )
+                            : null,
+                      ),
+                    ),
+                    SizedBox(height: 24),
+                    Text(
+                      'Performance Overview',
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        fontSize: 20,
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                  ],
+                ),
+              ),
+            ),
+            Consumer<DataService>(
+              builder: (context, dataService, child) {
+                final performance = dataService.performance;
+                if (performance == null) {
+                  return SliverToBoxAdapter(
+                    child: Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+                }
+
+                return SliverToBoxAdapter(
+                  child: AnimationLimiter(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: Column(
+                        children: AnimationConfiguration.toStaggeredList(
+                          duration: Duration(milliseconds: 600),
+                          childAnimationBuilder: (widget) => SlideAnimation(
+                            horizontalOffset: 50.0,
+                            child: FadeInAnimation(
+                              child: widget,
+                            ),
+                          ),
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: PerformanceCard(
+                                    title: 'YouTube Shorts',
+                                    value: performance.youtubeShorts.toString(),
+                                    icon: Icons.video_library,
+                                    color: Colors.red,
+                                    onTap: () => _showChartDialog(
+                                      context,
+                                      'YouTube Views Trend',
+                                      ChartWidget(
+                                        title: 'Views This Week',
+                                        data: performance.viewsChart,
+                                        type: ChartType.line,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: PerformanceCard(
+                                    title: 'Total Views',
+                                    value: _formatNumber(performance.totalViews),
+                                    icon: Icons.visibility,
+                                    color: Colors.blue,
+                                    onTap: () => _showChartDialog(
+                                      context,
+                                      'Views Analytics',
+                                      ChartWidget(
+                                        title: 'Daily Views',
+                                        data: performance.viewsChart,
+                                        type: ChartType.line,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: PerformanceCard(
+                                    title: 'Followers',
+                                    value: _formatNumber(performance.followers),
+                                    icon: Icons.people,
+                                    color: Colors.green,
+                                    onTap: () => _showChartDialog(
+                                      context,
+                                      'Follower Growth',
+                                      ChartWidget(
+                                        title: 'Weekly Growth',
+                                        data: performance.followersChart,
+                                        type: ChartType.bar,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: PerformanceCard(
+                                    title: 'Leads',
+                                    value: performance.leads.toString(),
+                                    icon: Icons.trending_up,
+                                    color: Colors.orange,
+                                    onTap: () => _showChartDialog(
+                                      context,
+                                      'Lead Sources',
+                                      ChartWidget(
+                                        title: 'Lead Distribution',
+                                        pieData: performance.leadsChart,
+                                        type: ChartType.pie,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 24),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                'Recent Tasks',
+                                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                  fontSize: 20,
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: 16),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            Consumer<DataService>(
+              builder: (context, dataService, child) {
+                final tasks = dataService.tasks
+                    .where((task) => task.title
+                        .toLowerCase()
+                        .contains(_searchQuery.toLowerCase()))
+                    .toList();
+
+                if (tasks.isEmpty) {
+                  return SliverToBoxAdapter(
+                    child: Container(
+                      padding: EdgeInsets.all(32),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.task_outlined,
+                            size: 64,
+                            color: AppConstants.textSecondary,
+                          ),
+                          SizedBox(height: 16),
+                          Text(
+                            _searchQuery.isEmpty
+                                ? 'No tasks available'
+                                : 'No tasks found for "$_searchQuery"',
+                            style: Theme.of(context).textTheme.bodyLarge,
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                return SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      return AnimationConfiguration.staggeredList(
+                        position: index,
+                        duration: Duration(milliseconds: 600),
+                        child: SlideAnimation(
+                          verticalOffset: 50.0,
+                          child: FadeInAnimation(
+                            child: Padding(
+                              padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
+                              child: TaskItem(
+                                task: tasks[index],
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => TaskDetailsScreen(
+                                      taskId: tasks[index].id,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                    childCount: tasks.length,
+                  ),
+                );
+              },
+            ),
+            SliverToBoxAdapter(
+              child: Container(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  AppConstants.copyrightText,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
               ),
             ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Container(
-      padding: EdgeInsets.fromLTRB(16, 40, 16, 16),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundImage: NetworkImage(
-              'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=150&h=150&fit=crop&crop=face',
-            ),
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Welcome back,',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                Text(
-                  'Dr. Rajesh Kumar',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Stack(
-            children: [
-              IconButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => NotificationsScreen(
-                        notifications: notifications,
-                        onNotificationRead: (notification) {
-                          setState(() {
-                            int index = notifications.indexOf(notification);
-                            notifications[index] = notification.copyWith(isRead: true);
-                          });
-                        },
-                      ),
-                    ),
-                  );
-                },
-                icon: Icon(
-                  Icons.notifications_outlined,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              if (unreadNotificationCount > 0)
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: Container(
-                    padding: EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: AppColors.error,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    constraints: BoxConstraints(
-                      minWidth: 16,
-                      minHeight: 16,
-                    ),
-                    child: Text(
-                      unreadNotificationCount.toString(),
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSearchBar() {
-    return Container(
-      margin: EdgeInsets.all(16),
-      child: TextField(
-        onChanged: (value) {
-          setState(() {
-            searchQuery = value;
-          });
-        },
-        decoration: InputDecoration(
-          hintText: 'Search tasks...',
-          prefixIcon: Icon(Icons.search, color: AppColors.textLight),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: AppColors.divider),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: AppColors.divider),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: AppColors.primary),
-          ),
-          filled: true,
-          fillColor: Colors.white,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPerformanceCards() {
-    return Container(
-      height: 140,
-      margin: EdgeInsets.symmetric(horizontal: 8),
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        children: [
-          PerformanceCard(
-            title: 'YouTube Shorts',
-            value: performanceMetrics.youtube.shortsPosted.toString(),
-            subtitle: 'Posted this month',
-            icon: Icons.video_library,
-            color: Colors.red,
-            onTap: () => _showChartDialog('YouTube Views', performanceMetrics.youtube.viewsChart),
-          ),
-          PerformanceCard(
-            title: 'Total Followers',
-            value: _formatNumber(performanceMetrics.socialMedia.totalFollowers),
-            subtitle: 'Across all platforms',
-            icon: Icons.group,
-            color: Colors.blue,
-            onTap: () => _showChartDialog('Followers by Platform', performanceMetrics.socialMedia.followersChart),
-          ),
-          PerformanceCard(
-            title: 'Leads Generated',
-            value: performanceMetrics.leads.totalLeads.toString(),
-            subtitle: '${performanceMetrics.leads.conversionRate.toStringAsFixed(1)}% conversion',
-            icon: Icons.trending_up,
-            color: Colors.green,
-            onTap: () => _showChartDialog('Leads Over Time', performanceMetrics.leads.leadsChart),
-          ),
-          PerformanceCard(
-            title: 'Total Views',
-            value: _formatNumber(performanceMetrics.youtube.totalViews),
-            subtitle: 'YouTube video views',
-            icon: Icons.visibility,
-            color: Colors.purple,
-            onTap: () => _showChartDialog('Views Over Time', performanceMetrics.youtube.viewsChart),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildChartsSection() {
-    return Container(
-      margin: EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Performance Overview',
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
-          SizedBox(height: 16),
-          ChartWidget(
-            title: 'YouTube Views Trend',
-            data: performanceMetrics.youtube.viewsChart,
-            chartType: ChartType.line,
-          ),
-          SizedBox(height: 16),
-          ChartWidget(
-            title: 'Leads by Source',
-            pieData: performanceMetrics.leads.leadsSourceChart,
-            chartType: ChartType.pie,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTasksSection() {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Recent Tasks',
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-              TextButton(
-                onPressed: () {},
-                child: Text(
-                  'View All',
-                  style: TextStyle(color: AppColors.primary),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 8),
-          ...filteredTasks.take(5).map((task) => TaskItem(
-            task: task,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => TaskDetailsScreen(task: task),
-                ),
-              );
-            },
-          )).toList(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFooter() {
-    return Container(
-      margin: EdgeInsets.all(16),
-      padding: EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Text(
-            'Last updated: ${_formatDateTime(performanceMetrics.lastUpdated)}',
-            style: Theme.of(context).textTheme.bodyMedium,
-            textAlign: TextAlign.center,
-          ),
-          SizedBox(height: 8),
-          Text(
-            AppConstants.copyrightText,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppColors.textLight,
-              fontSize: 12,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showChartDialog(String title, List<ChartData> data) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Container(
-            padding: EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-                SizedBox(height: 20),
-                Container(
-                  height: 200,
-                  child: ChartWidget(
-                    title: '',
-                    data: data,
-                    chartType: ChartType.bar,
-                  ),
-                ),
-                SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text('Close'),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 
@@ -419,16 +416,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return number.toString();
   }
 
-  String _formatDateTime(DateTime dateTime) {
-    final now = DateTime.now();
-    final difference = now.difference(dateTime);
-    
-    if (difference.inHours < 1) {
-      return '${difference.inMinutes} minutes ago';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours} hours ago';
-    } else {
-      return '${difference.inDays} days ago';
-    }
+  void _showChartDialog(BuildContext context, String title, Widget chart) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 300,
+          child: chart,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 }
