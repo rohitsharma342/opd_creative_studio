@@ -39,16 +39,19 @@ class PerformanceModel {
 class ChartData {
   final String label;
   final double value;
+  final DateTime? date;
 
   ChartData({
     required this.label,
     required this.value,
+    this.date,
   });
 
   factory ChartData.fromJson(Map<String, dynamic> json) {
     return ChartData(
       label: json['label'] ?? '',
       value: (json['value'] ?? 0).toDouble(),
+      date: json['date'] != null ? DateTime.parse(json['date']) : null,
     );
   }
 }

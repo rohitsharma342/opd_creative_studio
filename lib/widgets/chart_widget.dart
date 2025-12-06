@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../utils/constants.dart';
-
-export 'package:opd_creative_studio/models/performance_model.dart' show ChartData, PieChartData;
+import '../models/performance_model.dart';
 
 enum ChartType { line, bar, pie }
 
