@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../models/performance_metrics.dart';
+import '../models/performance_metrics.dart' hide PieChartData;
 import '../utils/app_colors.dart';
 import '../utils/constants.dart';
 
@@ -9,7 +9,7 @@ enum ChartType { line, bar, pie }
 class ChartWidget extends StatelessWidget {
   final String title;
   final List<ChartData>? data;
-  final List<PieChartData>? pieData;
+  final List<PieData>? pieData;
   final ChartType chartType;
 
   const ChartWidget({
@@ -305,7 +305,7 @@ class ChartWidget extends StatelessWidget {
         Expanded(
           flex: 3,
           child: PieChart(
-            PieChartData(
+            fl_chart.PieChartData(
               pieTouchData: PieTouchData(
                 touchCallback: (FlTouchEvent event, pieTouchResponse) {},
                 enabled: true,
@@ -320,7 +320,7 @@ class ChartWidget extends StatelessWidget {
                   .entries
                   .map(
                     (e) => PieChartSectionData(
-                      color: Color(int.parse('0xFF${e.value.color.replaceAll('#', '')}'))),
+                      color: Color(int.parse('0xFF${e.value.color.replaceAll('#', '')}')):
                       value: e.value.value,
                       title: '${e.value.value.toInt()}%',
                       radius: 50,
@@ -349,7 +349,7 @@ class ChartWidget extends StatelessWidget {
                           width: 12,
                           height: 12,
                           decoration: BoxDecoration(
-                            color: Color(int.parse('0xFF${data.color.replaceAll('#', '')}'))),
+                            color: Color(int.parse('0xFF${data.color.replaceAll('#', '')}')):
                             shape: BoxShape.circle,
                           ),
                         ),

@@ -197,7 +197,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 height: 1.4,
               ),
             ),
-            if (notification.relatedId != null) ..[
+            if (notification.relatedId != null) ...[
               SizedBox(height: 12),
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
