@@ -1,10 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../models/performance_metrics.dart' hide PieChartData;
+import '../models/performance_metrics.dart';
 import '../utils/app_colors.dart';
 import '../utils/constants.dart';
 
 enum ChartType { line, bar, pie }
+
+class PieData {
+  final String label;
+  final double value;
+  final String color;
+
+  PieData({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+}
 
 class ChartWidget extends StatelessWidget {
   final String title;
@@ -38,7 +50,7 @@ class ChartWidget extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (title.isNotEmpty) ..[
+          if (title.isNotEmpty) ...<Widget>[
             Text(
               title,
               style: TextStyle(
@@ -305,7 +317,7 @@ class ChartWidget extends StatelessWidget {
         Expanded(
           flex: 3,
           child: PieChart(
-            fl_chart.PieChartData(
+            PieChartData(
               pieTouchData: PieTouchData(
                 touchCallback: (FlTouchEvent event, pieTouchResponse) {},
                 enabled: true,
@@ -320,7 +332,7 @@ class ChartWidget extends StatelessWidget {
                   .entries
                   .map(
                     (e) => PieChartSectionData(
-                      color: Color(int.parse('0xFF${e.value.color.replaceAll('#', '')}')):
+                      color: Color(int.parse('0xFF${e.value.color.replaceAll('#', '')}')),
                       value: e.value.value,
                       title: '${e.value.value.toInt()}%',
                       radius: 50,
@@ -340,7 +352,7 @@ class ChartWidget extends StatelessWidget {
           flex: 2,
           child: Column(
             children: pieData!
-                .map(
+                .map<Widget>(
                   (data) => Padding(
                     padding: EdgeInsets.symmetric(vertical: 4),
                     child: Row(
@@ -349,7 +361,7 @@ class ChartWidget extends StatelessWidget {
                           width: 12,
                           height: 12,
                           decoration: BoxDecoration(
-                            color: Color(int.parse('0xFF${data.color.replaceAll('#', '')}')):
+                            color: Color(int.parse('0xFF${data.color.replaceAll('#', '')}')),
                             shape: BoxShape.circle,
                           ),
                         ),
