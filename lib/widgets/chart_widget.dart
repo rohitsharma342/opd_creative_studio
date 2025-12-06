@@ -192,7 +192,7 @@ class ChartWidget extends StatelessWidget {
     }
 
     return PieChart(
-      fl_chart.PieChartData(
+      PieChartData(
         sections: pieData!
             .map(
               (data) => PieChartSectionData(
