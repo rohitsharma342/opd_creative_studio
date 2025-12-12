@@ -33,6 +33,7 @@ dependencies:
   ffi: ^2.1.0
   flutter_keyboard_visibility: ^6.0.0
   flutter_keyboard_visibility_web: ^2.0.0
+  web: ^0.5.1
 
 dev_dependencies:
   flutter_test:
